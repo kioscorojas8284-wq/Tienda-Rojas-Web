@@ -13,10 +13,13 @@ export default async function Productos({ searchParams }: { searchParams: { ok?:
     <section className="panel">
       <div className="phead">
         <div><h2>Productos</h2><span className="meta">{P.length} cargados · {P.filter((p) => p.publicado).length} publicados</span></div>
-        <Link className="btn pri" href="/admin/productos/nuevo">+ Nuevo producto</Link>
+        <div className="row">
+          <Link className="btn" href="/admin/productos/importar">Carga masiva (Excel)</Link>
+          <Link className="btn pri" href="/admin/productos/nuevo">+ Nuevo producto</Link>
+        </div>
       </div>
       {searchParams.ok && <div className="alert ok" style={{ marginBottom: 12 }}>Producto guardado.</div>}
-      {!P.length ? <div className="empty"><h3>Sin productos</h3><p>Tocá “Nuevo producto” para cargar el primero.</p></div> : (
+      {!P.length ? <div className="empty"><h3>Sin productos</h3><p>Tocá “Nuevo producto” para cargar el primero, o “Carga masiva” para subir muchos desde una planilla de Excel.</p></div> : (
         <div className="alist">
           {P.map((p) => (
             <div className="aitem" key={p.id}>

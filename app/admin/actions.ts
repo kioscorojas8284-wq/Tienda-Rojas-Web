@@ -7,6 +7,7 @@ import { telNorm } from '@/lib/format';
 import { descontarStock, reponerStock } from '@/lib/stock';
 import { upsertCliente } from '@/lib/clientes';
 import type { Estado, Pedido } from '@/lib/types';
+import { normalizar, leerPrecio, type Columna, type FilaProducto } from '@/lib/importar';
 
 const s = (f: FormData, k: string, max = 500) => String(f.get(k) ?? '').trim().slice(0, max);
 
@@ -136,4 +137,60 @@ export async function guardarConfig(f: FormData) {
   }).eq('id', 1);
   revalidatePath('/', 'layout');
   redirect('/admin/ajustes?ok=1');
+}
+
+/* ---------- carga masiva ---------- */
+
+export async function importarProductos(filas: FilaProducto[], columnas: Columna[], actualizar: boolean) {
+  await requireAdmin();
+  if (!Array.isArray(filas) || filas.length > 2000) return { ok: false, error: 'Se pueden importar hasta 2000 productos por vez.' };
+  const tiene = (c: Columna) => columnas.includes(c);
+  const { data: existentes } = await db().from('productos').select('id,nombre,imagenes');
+  const porNombre = new Map((existentes || []).map((p: any) => [normalizar(p.nombre), p]));
+
+  const nuevos: any[] = [];
+  let actualizados = 0, salteados = 0;
+  for (const f of filas) {
+    // se vuelve a validar en el servidor
+    const nombre = String(f.nombre || '').trim().slice(0, 160);
+    const precio = leerPrecio(f.precio);
+    if (!nombre || precio === null) { salteados++; continue; }
+    const datos: any = { nombre, precio };
+    if (tiene('categoria')) datos.categoria = String(f.categoria || '').slice(0, 60);
+    if (tiene('descripcion')) datos.descripcion = String(f.descripcion || '').slice(0, 4000);
+    if (tiene('stock')) datos.stock = f.stock == null ? null : Math.max(0, Math.floor(Number(f.stock)) || 0);
+    if (tiene('orden')) datos.orden = Math.floor(Number(f.orden) || 0);
+    if (tiene('publicado') && typeof f.publicado === 'boolean') datos.publicado = f.publicado;
+    const foto = typeof f.foto === 'string' && /^https:\/\/\S+$/i.test(f.foto) ? f.foto : '';
+
+    const ex = porNombre.get(normalizar(nombre));
+    if (ex) {
+      if (!actualizar) { salteados++; continue; }
+      if (foto && !(ex.imagenes || []).includes(foto)) datos.imagenes = [...(ex.imagenes || []), foto];
+      const { error } = await db().from('productos').update(datos).eq('id', ex.id);
+      if (error) return { ok: false, error: `Error en "${nombre}": ${error.message}` };
+      actualizados++;
+    } else {
+      nuevos.push({ publicado: true, ...datos, imagenes: foto ? [foto] : [] });
+      porNombre.set(normalizar(nombre), { id: '', nombre, imagenes: [] });
+    }
+  }
+  for (let i = 0; i < nuevos.length; i += 200) {
+    const { error } = await db().from('productos').insert(nuevos.slice(i, i + 200));
+    if (error) return { ok: false, error: `Se cargaron ${i} productos nuevos y después falló: ${error.message}` };
+  }
+  revalidatePath('/', 'layout');
+  return { ok: true, creados: nuevos.length, actualizados, salteados };
+}
+
+export async function agregarFotos(productoId: string, urls: string[]) {
+  await requireAdmin();
+  const base = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/productos/`;
+  const validas = (urls || []).filter((u) => typeof u === 'string' && u.startsWith(base)).slice(0, 12);
+  const { data } = await db().from('productos').select('imagenes').eq('id', productoId).maybeSingle();
+  if (!data) return { ok: false };
+  const imagenes = [...(data.imagenes || []), ...validas.filter((u) => !(data.imagenes || []).includes(u))].slice(0, 12);
+  await db().from('productos').update({ imagenes }).eq('id', productoId);
+  revalidatePath('/', 'layout');
+  return { ok: true };
 }

@@ -13,6 +13,7 @@ Tienda online con panel de administración.
 - Inicio: lo que tenés por cobrar, para entregar, lo cobrado en el mes y los cumpleaños del mes.
 - Pedidos: los de la web aparecen solos. Cambiás el estado (reservado, pagado, entregado, cancelado) y podés cargar ventas a mano.
 - Productos: alta y edición con fotos, publicar u ocultar, stock y orden.
+- **Carga masiva** (Productos → Carga masiva): subís una planilla de Excel o CSV con muchos productos (o para actualizar precios y stock), ves una vista previa y confirmás. También podés subir muchas fotos juntas, nombradas igual que cada producto.
 - Clientes: lista con compras y total gastado, alta manual, link + QR de registro y exportación a Excel.
 - Ajustes: nombre, WhatsApp, alias, CBU, dirección de retiro y horario.
 
